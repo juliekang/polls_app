@@ -26,22 +26,23 @@ class Response < ActiveRecord::Base
 
   def respondent_has_not_already_answered_question
     er = existing_responses
-    return true if er.empty?
-    er.length == 1 && er.first.id == self.id
+    p er
+    unless er.empty? || (er.length == 1 && er.first.id == self.id)
+      errors[:user_id] << "You already answered this question!"
+    end
   end
 
   def author_cannot_answer_own_poll
-    users = User.joins(:authored_polls => {:questions => :responses})
-                .where("questions.id = ? AND responses.id = ?",
-                        self.question.id, self.id)
+    users = User.joins(:authored_polls => {:questions => :answer_choices})
+               .where("answer_choices.id ", self.answer_choice_id)
 
-    return false if users.empty?
-    users[0].id != self.user_id
+    if users[0].id == self.user_id
+      errors[:user_id] << "You can't answer your own poll!"
+    end  
   end
 
-
   def existing_responses
-    Response.find_by_sql([<<-SQL, {:user_id => self.user_id, :id => self.id}])
+    Response.find_by_sql([<<-SQL, {:user_id => self.user_id, :answer_choice_id => self.answer_choice_id}])
       SELECT
         responses.*
       FROM
@@ -55,13 +56,9 @@ class Response < ActiveRecord::Base
           SELECT
             answer_choices.question_id
           FROM
-            responses
-          JOIN
             answer_choices
-          ON
-            responses.answer_choice_id = answer_choices.id
           WHERE
-            responses.id = :id)
+            answer_choices.id = :answer_choice_id)
     SQL
   end
 
