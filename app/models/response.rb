@@ -2,7 +2,7 @@ class Response < ActiveRecord::Base
   attr_accessible :user_id, :answer_choice_id
   validates :user_id, :answer_choice_id, :presence => true
   validate :respondent_has_not_already_answered_question
-  #validate :author_cannot_answer_own_poll
+  validate :author_cannot_answer_own_poll
 
   belongs_to(
     :respondent,
@@ -18,18 +18,26 @@ class Response < ActiveRecord::Base
     :primary_key => :id
   )
 
+  has_one(
+    :question,
+    :through => :answer_choice,
+    :source => :question
+  )
+
   def respondent_has_not_already_answered_question
     er = existing_responses
+    return true if er.empty?
     er.length == 1 && er.first.id == self.id
   end
 
-  # def author_cannot_answer_own_poll
-  #   users = User.joins(:authored_polls => {:questions => :responses})
-  #               .where("answer_choices.id = ? AND responses.id = ?",
-  #                       self.answer_choice_id, self.id)
-  #
-  #   users[0].id != self.user_id
-  # end
+  def author_cannot_answer_own_poll
+    users = User.joins(:authored_polls => {:questions => :responses})
+                .where("questions.id = ? AND responses.id = ?",
+                        self.question.id, self.id)
+
+    return false if users.empty?
+    users[0].id != self.user_id
+  end
 
 
   def existing_responses
